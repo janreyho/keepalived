@@ -1,25 +1,29 @@
-The main goal of the keepalived project is to add a strong & robust
-keepalive facility to the Linux Virtual Server project.
-It implements a multilayer TCP/IP stack checks. Keepalived implements
-a framework based on three family checks : Layer3, Layer4 & Layer5. 
-This framework gives the daemon the ability of checking a LVS server 
-pool states. Keepalived can be sumarize as a LVS driving daemon.
+# 简介
 
-Keepalived implementation is based on an I/O multiplexer to handle a 
-strong multi-threading framework. All the events process use this I/O
-multiplexer.
+###总体结构
 
-Keepalived is free software, Copyright (C) Alexandre Cassen.
-See the file COPYING for copying conditions.
+Keepalived 大致分两层结构:用户空间 user space 和内核空间 kernel space。用C编写的类似于layer3, 4 & 7交换机制软件，具备我们平时说的第3层、第4层和第7层交换机的功能。主要提供**loadbalancing**（负载均衡）和 **high-availability**（高可用）功能，负载均衡实现需要依赖[Linux](http://lib.csdn.net/base/linux)的虚拟服务内核模块（ipvs），而高可用是通过VRRP协议实现多台机器之间的故障转移服务。 
 
+![Keepalived体系结构](http://www.keepalived.org/images/Software%20Design.gif) 
 
-OPENSSL TOOLKIT LICENCE EXCEPTION
+在这个结构图里，处于下端的是内核空间，它包括 ipvs 和 NETLINK 两个部分。Ipvs 的作用在前面的章节已 做过 述，不再重复叙述;netlink 提供高级路由及其他相关的网络功能，如果我们在负载均衡器上启用 netfilter/iptable,将会直接影响它的性能。出于图形上方的组件为用户空间，由它来实现具体的功能，下面选取几个重要的来做说明:
 
-In addition, as the copyright holder of Keepalived,
-I, Alexandre Cassen, <acassen@linux-vs.org>,
-grant the following special exception: 
+1、 WatchDog 负责监控 checkers 和 VRRP 进程的状况。
+2、 Checkers 负责真实服务器的健康检查 healthchecking，是 keepalived 最主要的功能。换
 
-        I, Alexandre Cassen, <acassen@linux-vs.org>, explicitly allow
-        the compilation and distribution of the Keepalived software with
-        the OpenSSL Toolkit.
+句话说—可以没有 VRRP Stack,但健康检查 healthchecking 是一定要有的。
+3、VRRP Stack 负责负载均衡器之间的失败切换 FailOver.如果只用一个负载均衡器，则
 
+VRRP 不是必须的。
+4、 IPVS wrapper 用来发送设定的规则到内核 ipvs 代码。
+5、 Netlink Reflector 用来设定 vrrp 的 vip 地址等。
+
+Keepalived 各种功能的实现是通过设置其配置文件 keepalived.conf 来完成的，关于配置文件各项的用途，将在后面的章节进行 述。
+
+### 说明
+
+1、 keepalived 是 lvs 的扩展项目，因此它们之间具备良好的兼容性。这点应该是 keepalived部署比其他类似工具能更简洁的原因吧!
+
+2、 通过对服务器池对象的健康检查，实现对失效机器/服务的故障隔离。
+
+3、负载均衡器之间的失败切换failover，是通过VRRPv(2 VirtualRouterRedundancyProtocol)stack 实现的。
